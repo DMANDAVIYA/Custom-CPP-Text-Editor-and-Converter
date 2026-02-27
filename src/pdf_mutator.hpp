@@ -50,10 +50,20 @@ public:
 
                     size_t pos = 0;
                     bool modified = false;
+                    
+                    std::cout << "Attempting to replace: '" << escaped_orig << "' with '" << escaped_new << "'" << std::endl;
+                    
                     while ((pos = content_str.find(escaped_orig, pos)) != std::string::npos) {
                         content_str.replace(pos, escaped_orig.length(), escaped_new);
                         pos += escaped_new.length();
                         modified = true;
+                        std::cout << " -> Match found and replaced!" << std::endl;
+                    }
+
+                    if (!modified) {
+                        std::cout << " -> Match NOT found in the raw content stream!" << std::endl;
+                        // Let's print a small snippet of the stream for debugging
+                        std::cout << " -> Stream preview: " << content_str.substr(0, 200) << "..." << std::endl;
                     }
 
                     // If we made a successful mutation, write the buffer back into the PDF tree
