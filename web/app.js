@@ -47,9 +47,11 @@ saveBtn.addEventListener('click', async () => {
             .replace(/[\u201C\u201D\u201e\u201f]/g, '"')
             .replace(/[\u2013\u2014\u2012\u2015]/g, "-")
             .replace(/[\u2022\u25cf\u25cb\u25e6\u2023]/g, "*")
-            .replace(/[^\x00-\x7F]/g, "");
+            .replace(/[^\x00-\x7F]/g, "")
+            .replace(/\s+/g, ' ');
 
-        const orig = input.dataset.originalText;
+        let orig = input.dataset.originalText;
+        orig = orig.replace(/\s+/g, ' ');
 
         if (text !== orig) {
             modifications.push({
@@ -209,6 +211,9 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
                     .replace(/[\u2013\u2014\u2012\u2015]/g, "-")
                     .replace(/[\u2022\u25cf\u25cb\u25e6\u2023]/g, "*")
                     .replace(/[^\x00-\x7F]/g, "");
+
+                // Shrink multi spaces for safety
+                safeText = safeText.replace(/\s+/g, ' ');
 
                 input.innerText = safeText;
 
