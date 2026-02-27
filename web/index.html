@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Override: Canvas Projection</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="crt-overlay"></div>
+    <div class="terminal-container">
+        <header>
+            <h1>SYS_OVERRIDE // PDF_CANVAS_PROJECTION</h1>
+            <p>STATUS: ONLINE | ENGINE: C++ NATIVE HYPER-RENDERER</p>
+        </header>
+
+        <main id="main-content">
+            <div id="upload-screen">
+                <p>INITIALIZING BYTESTREAM INJECTION...</p>
+                <p>PLEASE LOAD PDF DOCUMENT FOR CANVAS PROJECTION.</p>
+
+                <input type="file" id="pdf-upload" accept="application/pdf">
+                <label for="pdf-upload" class="btn">>> UPLOAD_PDF <<< /label>
+
+                        <div id="loading-indicator" class="hidden">
+                            <p>EXTRACTING BOUNDING BOXES...</p>
+                            <p>RENDERING BACKGROUND GRAPHICS...</p>
+                            <span class="blinking-cursor">_</span>
+                        </div>
+            </div>
+
+            <div id="editor-screen" class="hidden">
+                <div class="toolbar">
+                    <button id="save-btn" class="btn">>> COMPILE && SAVE_PDF <<< /button>
+                            <button id="close-btn" class="btn">>> ABORT <<< /button>
+                </div>
+
+                <div id="canvas-wrapper">
+                    <div id="pages-container"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

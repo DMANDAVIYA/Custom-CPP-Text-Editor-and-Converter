@@ -1,0 +1,198 @@
+:root {
+    --crt-bg: #050505;
+    --crt-green: #0f0;
+    --crt-dim: #055000;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--crt-bg);
+    color: var(--crt-green);
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+}
+
+/* CRT Effects */
+.crt-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.terminal-container {
+    padding: 20px;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    text-shadow: 0 0 5px var(--crt-green);
+}
+
+header {
+    border-bottom: 2px solid var(--crt-dim);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#upload-screen {
+    text-align: center;
+    margin-top: 50px;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: 1px solid var(--crt-green);
+    color: var(--crt-green);
+    cursor: pointer;
+    background: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--crt-green);
+    transition: all 0.2s;
+    margin: 10px;
+}
+
+.btn:hover {
+    background: var(--crt-green);
+    color: var(--crt-bg);
+    box-shadow: 0 0 15px var(--crt-green);
+}
+
+.blinking-cursor {
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+#main-content {
+    flex: 1 1 auto;
+    /* Allows main flex to grow AND shrink to fit window bounds */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    /* Crucial flexbox fix for nested scrolling children */
+}
+
+/* Editor Canvas UI */
+#editor-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    /* Same nested flexbox fix */
+    overflow: hidden;
+    min-height: 0;
+}
+
+.toolbar {
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    /* Never shrink toolbar */
+}
+
+#canvas-wrapper {
+    position: relative;
+    width: 100%;
+    flex: 1 1 auto;
+    /* Grow to fill remaining space */
+    overflow-y: auto;
+    overflow-x: auto;
+    padding-bottom: 50px;
+    min-height: 0;
+    /* Crucial for absolute scrolling bounds */
+}
+
+#pages-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    /* Space between PDF pages */
+    padding: 20px 0;
+}
+
+.page-container {
+    position: relative;
+    /* Box shadow to look like a page */
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+}
+
+.pdf-bg-canvas {
+    display: block;
+}
+
+.text-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    /* Important for scroll bounds: make this layer not extend the parent arbitrarily */
+    height: 100%;
+}
+
+/* Transparent until hovered/focused */
+.text-overlay-input {
+    position: absolute;
+    background: transparent;
+    color: transparent;
+    border: 1px solid transparent;
+    padding: 0;
+    margin: 0;
+    font-family: sans-serif;
+    font-size: 16px;
+    outline: none;
+    box-sizing: border-box;
+    white-space: pre;
+    overflow: hidden;
+    line-height: 1;
+    pointer-events: auto;
+    /* Allow clicking on inputs */
+}
+
+.text-overlay-input:hover {
+    border: 1px dashed rgba(0, 255, 0, 0.3);
+    cursor: text;
+}
+
+.text-overlay-input:focus {
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid var(--crt-green);
+    color: var(--crt-green);
+    box-shadow: 0 0 10px var(--crt-green);
+    z-index: 100;
+}

@@ -1,0 +1,10 @@
+services:
+  pdf_engine:
+    build: .
+    container_name: pdfmaker_engine
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/usr/src/app
+    restart: unless-stopped
+    command: /bin/bash -c "mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j$$(nproc) && ./pdfmaker_engine"
