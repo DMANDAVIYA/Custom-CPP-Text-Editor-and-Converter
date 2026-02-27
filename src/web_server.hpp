@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include "pdf_engine.hpp"
+#include "pdf_mutator.hpp"
 
 namespace pdfmaker {
 
@@ -98,6 +99,45 @@ private:
             } else {
                 res.status = 500;
                 res.set_content(nlohmann::json({{"error", "Render failed"}}).dump(), "application/json");
+            }
+        });
+
+        // Compile PDF mutations and return new generated PDF
+        svr_.Post("/api/pdf/compile", [this](const httplib::Request& req, httplib::Response& res) {
+            if (!req.has_file("file") || !req.has_file("modifications")) {
+                res.status = 400;
+                res.set_content(nlohmann::json({{"error", "Missing file or modifications"}}).dump(), "application/json");
+                return;
+            }
+
+            auto file = req.get_file_value("file");
+            auto mod_str = req.get_file_value("modifications").content;
+            
+            nlohmann::json modifications;
+            try {
+                modifications = nlohmann::json::parse(mod_str);
+            } catch (const std::exception& e) {
+                res.status = 400;
+                res.set_content(nlohmann::json({{"error", std::string("Invalid JSON parsing: ") + e.what()}}).dump(), "application/json");
+                return;
+            }
+
+            std::string temp_input = "/tmp/temp_compile_in.pdf";
+            std::string temp_output = "/tmp/temp_compile_out.pdf";
+            
+            std::ofstream out(temp_input, std::ios::binary);
+            out.write(file.content.data(), file.content.length());
+            out.close();
+
+            PdfMutator mutator(pdf_engine_.get_ctx());
+            if (mutator.mutate_document(temp_input, temp_output, modifications)) {
+                std::ifstream in(temp_output, std::ios::binary);
+                std::string pdf_data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                res.set_content(pdf_data, "application/pdf");
+                res.set_header("Content-Disposition", "attachment; filename=\"modified.pdf\"");
+            } else {
+                res.status = 500;
+                res.set_content(nlohmann::json({{"error", "Mutation engine failed to process the PDF"}}).dump(), "application/json");
             }
         });
     }

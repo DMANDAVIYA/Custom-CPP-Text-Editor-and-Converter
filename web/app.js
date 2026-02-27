@@ -35,7 +35,63 @@ closeBtn.addEventListener('click', () => {
 });
 
 saveBtn.addEventListener('click', async () => {
-    alert("COMPILE FUNCTION NOT YET IMPLEMENTED IN C++.");
+    if (!currentFile) return;
+
+    const modifications = [];
+    const inputs = document.querySelectorAll('.text-overlay-input');
+
+    inputs.forEach(input => {
+        const text = input.innerText.trim();
+        const orig = input.dataset.originalText;
+
+        if (text !== orig) {
+            modifications.push({
+                page: parseInt(input.dataset.page),
+                id: parseInt(input.dataset.idx), // Keep an ID for matching if needed
+                x: parseFloat(input.dataset.x),
+                y: parseFloat(input.dataset.y),
+                text: text,
+                orig: orig
+            });
+        }
+    });
+
+    if (modifications.length === 0) {
+        alert("NO MODIFICATIONS DETECTED.");
+        return;
+    }
+
+    try {
+        saveBtn.innerText = ">> COMPILING... <<";
+
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        formData.append('modifications', JSON.stringify(modifications));
+
+        const compileRes = await fetch('/api/pdf/compile', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!compileRes.ok) throw new Error(await compileRes.text());
+
+        // Trigger download of the modified PDF
+        const blob = await compileRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "SYS_OVERRIDE_" + currentFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+    } catch (err) {
+        console.error(err);
+        alert("COMPILE ERROR: " + err.message);
+    } finally {
+        saveBtn.innerText = ">> COMPILE && SAVE_PDF <<";
+    }
 });
 
 async function loadAllPdfPages(file) {
@@ -139,6 +195,9 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
                 // Store tracking info
                 input.dataset.page = pageNum;
                 input.dataset.idx = idx;
+                input.dataset.originalText = block.text;
+                input.dataset.x = block.x;
+                input.dataset.y = block.y;
 
                 input.addEventListener('focus', () => {
                     input.style.color = 'var(--crt-green)';
@@ -146,8 +205,17 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
                 });
 
                 input.addEventListener('blur', () => {
-                    input.style.color = 'transparent';
-                    input.style.background = 'transparent';
+                    if (input.innerText.trim() !== input.dataset.originalText) {
+                        // Text modified! Block out the original PDF image text behind it
+                        input.style.color = '#000'; // Black text
+                        input.style.background = '#fff'; // White background to cover original
+                        input.style.border = '1px dashed var(--crt-green)'; // Keep it highlighted as edited
+                    } else {
+                        // Revert to invisible wrapper
+                        input.style.color = 'transparent';
+                        input.style.background = 'transparent';
+                        input.style.border = '1px solid transparent';
+                    }
                 });
 
                 textLayer.appendChild(input);

@@ -23,6 +23,10 @@ public:
         fz_drop_context(ctx);
     }
 
+    fz_context* get_ctx() {
+        return ctx;
+    }
+
     int get_page_count(const std::string& filename) {
         fz_document *doc = NULL;
         int page_count = 0;
