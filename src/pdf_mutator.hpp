@@ -18,9 +18,9 @@ public:
         pdf_document *doc = nullptr;
         bool success = false;
 
-        try {
+        fz_try(ctx_) {
             doc = pdf_open_document(ctx_, input_pdf.c_str());
-            if (!doc) throw std::runtime_error("Failed to open PDF for mutation");
+            if (!doc) fz_throw(ctx_, FZ_ERROR_GENERIC, "Failed to open PDF for mutation");
 
             // Iterate over modifications array
             for (const auto& mod : modifications) {
@@ -31,49 +31,67 @@ public:
                 pdf_obj *page_obj = pdf_lookup_page_obj(ctx_, doc, page_index);
                 if (!page_obj) continue;
 
-                pdf_obj *contents = pdf_dict_get(ctx_, page_obj, PDF_NAME(Contents));
-                if (!contents) continue;
+                // Load page details to get the coordinate space boundaries
+                fz_page *fzpage = fz_load_page(ctx_, (fz_document*)doc, page_index);
+                fz_rect bounds = fz_bound_page(ctx_, fzpage);
+                fz_drop_page(ctx_, fzpage);
 
-                // Load the decoded content stream buffer
-                fz_buffer *buf = pdf_load_stream(ctx_, contents);
-                if (!buf) continue;
+                float page_ht = bounds.y1 - bounds.y0;
+                float pdf_x = mod["x"];
+                float pdf_y = mod["y"];
+                // We need to invert the Y coordinate from top-left to Bottom-Left for PDF streams
+                float inverted_y = page_ht - pdf_y - static_cast<float>(mod["height"]); 
 
-                unsigned char *data = nullptr;
-                size_t len = fz_buffer_storage(ctx_, buf, &data);
-                if (data && len > 0) {
-                    std::string content_str(reinterpret_cast<char*>(data), len);
-                    
-                    // Naive Byte Stream Mutation: finding exact PDF String Objects (text)
-                    // and modifying them inline without touching anything else!
-                    std::string escaped_orig = "(" + originalStr + ")";
-                    std::string escaped_new = "(" + newStr + ")";
-
-                    size_t pos = 0;
-                    bool modified = false;
-                    
-                    std::cout << "Attempting to replace: '" << escaped_orig << "' with '" << escaped_new << "'" << std::endl;
-                    
-                    while ((pos = content_str.find(escaped_orig, pos)) != std::string::npos) {
-                        content_str.replace(pos, escaped_orig.length(), escaped_new);
-                        pos += escaped_new.length();
-                        modified = true;
-                        std::cout << " -> Match found and replaced!" << std::endl;
-                    }
-
-                    if (!modified) {
-                        std::cout << " -> Match NOT found in the raw content stream!" << std::endl;
-                        // Let's print a small snippet of the stream for debugging
-                        std::cout << " -> Stream preview: " << content_str.substr(0, 200) << "..." << std::endl;
-                    }
-
-                    // If we made a successful mutation, write the buffer back into the PDF tree
-                    if (modified) {
-                        fz_buffer* new_buf = fz_new_buffer_from_copied_data(ctx_, reinterpret_cast<const unsigned char*>(content_str.data()), content_str.length());
-                        pdf_update_stream(ctx_, doc, contents, new_buf, 0);
-                        fz_drop_buffer(ctx_, new_buf);
-                    }
+                // 1. Inject a standard Helvetica font dictionary into the page resources so we can write real text regardless of original hex subsetting
+                pdf_obj *res = pdf_dict_get(ctx_, page_obj, PDF_NAME(Resources));
+                if (!res) {
+                    res = pdf_new_dict(ctx_, doc, 1);
+                    pdf_dict_put_drop(ctx_, page_obj, PDF_NAME(Resources), res);
                 }
-                fz_drop_buffer(ctx_, buf);
+                pdf_obj *fonts = pdf_dict_get(ctx_, res, PDF_NAME(Font));
+                if (!fonts) {
+                    fonts = pdf_new_dict(ctx_, doc, 1);
+                    pdf_dict_put_drop(ctx_, res, PDF_NAME(Font), fonts);
+                }
+                
+                pdf_obj *helv = pdf_new_dict(ctx_, doc, 4);
+                pdf_dict_puts_drop(ctx_, helv, "Type", pdf_new_name(ctx_, "Font"));
+                pdf_dict_puts_drop(ctx_, helv, "Subtype", pdf_new_name(ctx_, "Type1"));
+                pdf_dict_puts_drop(ctx_, helv, "BaseFont", pdf_new_name(ctx_, "Helvetica"));
+                pdf_dict_puts_drop(ctx_, helv, "Encoding", pdf_new_name(ctx_, "WinAnsiEncoding"));
+                pdf_dict_puts_drop(ctx_, fonts, "SysOverrideFont", helv);
+
+                // 2. Append directly to the Page Content array to "whiteout" the old coords and write our new string on top
+                fz_buffer *over_buf = fz_new_buffer(ctx_, 256);
+                
+                // White rectangle to erase old text
+                fz_append_printf(ctx_, over_buf, "q 1 1 1 rg %f %f %f %g re f Q\n", 
+                    pdf_x, inverted_y, static_cast<float>(mod["width"]), static_cast<float>(mod["height"]));
+                
+                // New text override
+                fz_append_printf(ctx_, over_buf, "q 0 0 0 rg BT /SysOverrideFont %f Tf %f %f Td (%s) Tj ET Q\n", 
+                    static_cast<float>(mod["height"]) * 0.8f, // Approximate points from bounding box height
+                    pdf_x, inverted_y + (static_cast<float>(mod["height"]) * 0.2f), // Baseline shift
+                    newStr.c_str());
+
+                // Create a stream object and attach the buffer
+                pdf_obj *dummy_dict = pdf_new_dict(ctx_, doc, 0);
+                pdf_obj *new_stream_obj = pdf_add_object_drop(ctx_, doc, dummy_dict);
+                pdf_update_stream(ctx_, doc, new_stream_obj, over_buf, 0);
+
+                pdf_obj *contents = pdf_dict_get(ctx_, page_obj, PDF_NAME(Contents));
+                
+                if (pdf_is_array(ctx_, contents)) {
+                    pdf_array_push(ctx_, contents, new_stream_obj);
+                } else {
+                    pdf_obj *new_arr = pdf_new_array(ctx_, doc, 2);
+                    pdf_array_push(ctx_, new_arr, contents);
+                    pdf_array_push(ctx_, new_arr, new_stream_obj);
+                    pdf_dict_put_drop(ctx_, page_obj, PDF_NAME(Contents), new_arr);
+                }
+                
+                pdf_drop_obj(ctx_, new_stream_obj);
+                fz_drop_buffer(ctx_, over_buf);
             }
 
             // Save the altered file
@@ -81,8 +99,8 @@ public:
             pdf_save_document(ctx_, doc, output_pdf.c_str(), &write_opts);
             success = true;
 
-        } catch (const std::exception& e) {
-            std::cerr << "Mutation Engine Error: " << e.what() << std::endl;
+        } fz_catch(ctx_) {
+            std::cerr << "Mutation Engine Error: " << fz_caught_message(ctx_) << std::endl;
         }
 
         if (doc) pdf_drop_document(ctx_, doc);

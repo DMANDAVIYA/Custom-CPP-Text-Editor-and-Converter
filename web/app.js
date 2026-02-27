@@ -50,6 +50,8 @@ saveBtn.addEventListener('click', async () => {
                 id: parseInt(input.dataset.idx), // Keep an ID for matching if needed
                 x: parseFloat(input.dataset.x),
                 y: parseFloat(input.dataset.y),
+                width: parseFloat(input.dataset.width),
+                height: parseFloat(input.dataset.height),
                 text: text,
                 orig: orig
             });
@@ -198,6 +200,8 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
                 input.dataset.originalText = block.text;
                 input.dataset.x = block.x;
                 input.dataset.y = block.y;
+                input.dataset.width = block.width;
+                input.dataset.height = block.height;
 
                 input.addEventListener('focus', () => {
                     input.style.color = 'var(--crt-green)';

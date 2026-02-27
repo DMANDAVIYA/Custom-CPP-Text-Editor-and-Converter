@@ -37,16 +37,26 @@ add_executable(pdfmaker_engine
     src/main.cpp
 )
 
+add_executable(test_mutator
+    src/test_mutator.cpp
+)
+
 # Includes
 target_include_directories(pdfmaker_engine PRIVATE 
+    src/
+    ${MUPDF_INCLUDE_DIRS}
+)
+target_include_directories(test_mutator PRIVATE 
     src/
     ${MUPDF_INCLUDE_DIRS}
 )
 
 if(NLOHMANN_JSON_INCLUDE_DIR)
     target_include_directories(pdfmaker_engine PRIVATE ${NLOHMANN_JSON_INCLUDE_DIR})
+    target_include_directories(test_mutator PRIVATE ${NLOHMANN_JSON_INCLUDE_DIR})
 else()
     target_link_libraries(pdfmaker_engine PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(test_mutator PRIVATE nlohmann_json::nlohmann_json)
 endif()
 
 # Linking
@@ -66,7 +76,24 @@ target_link_libraries(pdfmaker_engine PRIVATE
     z
 )
 
+target_link_libraries(test_mutator PRIVATE
+    httplib::httplib
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ${MUPDF_LIBRARIES}
+    mupdf-third
+    freetype
+    harfbuzz
+    jbig2dec
+    jpeg
+    openjp2
+    mujs
+    gumbo
+    z
+)
+
 # On Linux, httplib needs pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(pdfmaker_engine PRIVATE Threads::Threads)
+target_link_libraries(test_mutator PRIVATE Threads::Threads)

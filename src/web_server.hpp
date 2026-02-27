@@ -104,14 +104,24 @@ private:
 
         // Compile PDF mutations and return new generated PDF
         svr_.Post("/api/pdf/compile", [this](const httplib::Request& req, httplib::Response& res) {
-            if (!req.has_file("file") || !req.has_file("modifications")) {
+            if (!req.has_file("file")) {
                 res.status = 400;
-                res.set_content(nlohmann::json({{"error", "Missing file or modifications"}}).dump(), "application/json");
+                res.set_content(nlohmann::json({{"error", "Missing file"}}).dump(), "application/json");
                 return;
             }
 
             auto file = req.get_file_value("file");
-            auto mod_str = req.get_file_value("modifications").content;
+            std::string mod_str = "";
+            
+            if (req.has_file("modifications")) {
+                mod_str = req.get_file_value("modifications").content;
+            } else if (req.has_param("modifications")) {
+                mod_str = req.get_param_value("modifications");
+            } else {
+                res.status = 400;
+                res.set_content(nlohmann::json({{"error", "Missing modifications payload"}}).dump(), "application/json");
+                return;
+            }
             
             nlohmann::json modifications;
             try {
