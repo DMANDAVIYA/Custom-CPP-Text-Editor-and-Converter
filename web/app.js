@@ -41,7 +41,14 @@ saveBtn.addEventListener('click', async () => {
     const inputs = document.querySelectorAll('.text-overlay-input');
 
     inputs.forEach(input => {
-        const text = input.innerText.trim();
+        let text = input.innerText.trim();
+        // Fallback sanitize UTF-8 quotes and bullets to standard ASCII
+        text = text.replace(/[\u2018\u2019\u00B4\u0060\u201a\u201b]/g, "'")
+            .replace(/[\u201C\u201D\u201e\u201f]/g, '"')
+            .replace(/[\u2013\u2014\u2012\u2015]/g, "-")
+            .replace(/[\u2022\u25cf\u25cb\u25e6\u2023]/g, "*")
+            .replace(/[^\x00-\x7F]/g, "");
+
         const orig = input.dataset.originalText;
 
         if (text !== orig) {
@@ -52,6 +59,9 @@ saveBtn.addEventListener('click', async () => {
                 y: parseFloat(input.dataset.y),
                 width: parseFloat(input.dataset.width),
                 height: parseFloat(input.dataset.height),
+                r: parseFloat(input.dataset.r),
+                g: parseFloat(input.dataset.g),
+                b: parseFloat(input.dataset.b),
                 text: text,
                 orig: orig
             });
@@ -164,7 +174,7 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
             canvas.className = 'pdf-bg-canvas';
             canvas.width = img.width;
             canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
 
             // Text layer
@@ -192,16 +202,45 @@ function renderPageContainer(bgUrl, textBlocks, pageNum) {
                 input.style.height = `${h}px`;
                 input.style.fontSize = `${h}px`;
                 input.style.lineHeight = `${h}px`;
-                input.innerText = block.text;
+
+                let safeText = block.text.trim();
+                safeText = safeText.replace(/[\u2018\u2019\u00B4\u0060\u201a\u201b]/g, "'")
+                    .replace(/[\u201C\u201D\u201e\u201f]/g, '"')
+                    .replace(/[\u2013\u2014\u2012\u2015]/g, "-")
+                    .replace(/[\u2022\u25cf\u25cb\u25e6\u2023]/g, "*")
+                    .replace(/[^\x00-\x7F]/g, "");
+
+                input.innerText = safeText;
 
                 // Store tracking info
                 input.dataset.page = pageNum;
                 input.dataset.idx = idx;
-                input.dataset.originalText = block.text;
+                input.dataset.originalText = safeText;
                 input.dataset.x = block.x;
                 input.dataset.y = block.y;
                 input.dataset.width = block.width;
                 input.dataset.height = block.height;
+
+                // Sample strictly above the text block to get safe background color
+                const pxX = Math.floor((block.x + block.width / 2) * ZOOM);
+                const pxY = Math.floor(Math.max(0, block.y * ZOOM - 3));
+                const bgPx = ctx.getImageData(pxX, pxY, 1, 1).data;
+
+                let r = 1.0, g = 1.0, b = 1.0;
+                if (bgPx[3] > 0) { // If not completely transparent
+                    r = bgPx[0] / 255.0;
+                    g = bgPx[1] / 255.0;
+                    b = bgPx[2] / 255.0;
+                }
+
+                // If it sampled pitch black, it probably hit a line or text, default to white
+                if (r < 0.1 && g < 0.1 && b < 0.1) {
+                    r = 1.0; g = 1.0; b = 1.0;
+                }
+
+                input.dataset.r = r;
+                input.dataset.g = g;
+                input.dataset.b = b;
 
                 input.addEventListener('focus', () => {
                     input.style.color = 'var(--crt-green)';

@@ -9,6 +9,16 @@
 
 namespace pdfmaker {
 
+std::string escape_pdf_string(const std::string& str) {
+    std::string out;
+    out.reserve(str.length() * 2);
+    for (char c : str) {
+        if (c == '(' || c == ')' || c == '\\') out += '\\';
+        out += c;
+    }
+    return out;
+}
+
 class PdfMutator {
 public:
     PdfMutator(fz_context* ctx) : ctx_(ctx) {}
@@ -61,18 +71,31 @@ public:
                 pdf_dict_puts_drop(ctx_, helv, "Encoding", pdf_new_name(ctx_, "WinAnsiEncoding"));
                 pdf_dict_puts_drop(ctx_, fonts, "SysOverrideFont", helv);
 
+                float r = mod.value("r", 1.0f);
+                float g = mod.value("g", 1.0f);
+                float b = mod.value("b", 1.0f);
+
                 // 2. Append directly to the Page Content array to "whiteout" the old coords and write our new string on top
                 fz_buffer *over_buf = fz_new_buffer(ctx_, 256);
                 
-                // White rectangle to erase old text
-                fz_append_printf(ctx_, over_buf, "q 1 1 1 rg %f %f %f %g re f Q\n", 
-                    pdf_x, inverted_y, static_cast<float>(mod["width"]), static_cast<float>(mod["height"]));
+                // Shrink the height of the erasure bounding box slightly to avoid clipping adjacent horizontal table borders
+                float box_w = static_cast<float>(mod["width"]);
+                float box_h = static_cast<float>(mod["height"]);
+                float shrink_y = box_h * 0.15f; 
+                float shrink_w = box_w * 0.05f;
+
+                // Color-matched rectangle to erase old text seamlessly
+                fz_append_printf(ctx_, over_buf, "q %f %f %f rg %f %f %f %g re f Q\n", 
+                    r, g, b,
+                    pdf_x + (shrink_w/2), inverted_y + shrink_y, 
+                    box_w - shrink_w, box_h - (shrink_y * 1.5f));
                 
                 // New text override
+                std::string escaped_new = escape_pdf_string(newStr);
                 fz_append_printf(ctx_, over_buf, "q 0 0 0 rg BT /SysOverrideFont %f Tf %f %f Td (%s) Tj ET Q\n", 
-                    static_cast<float>(mod["height"]) * 0.8f, // Approximate points from bounding box height
-                    pdf_x, inverted_y + (static_cast<float>(mod["height"]) * 0.2f), // Baseline shift
-                    newStr.c_str());
+                    box_h * 0.82f, // Approximate points from bounding box height
+                    pdf_x, inverted_y + (box_h * 0.15f), // Baseline shift
+                    escaped_new.c_str());
 
                 // Create a stream object and attach the buffer
                 pdf_obj *dummy_dict = pdf_new_dict(ctx_, doc, 0);
