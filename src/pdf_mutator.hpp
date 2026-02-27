@@ -78,17 +78,17 @@ public:
                 // 2. Append directly to the Page Content array to "whiteout" the old coords and write our new string on top
                 fz_buffer *over_buf = fz_new_buffer(ctx_, 256);
                 
-                // Shrink the height of the erasure bounding box slightly to avoid clipping adjacent horizontal table borders
+                // Expand the erasure bounding box slightly to completely cover anti-aliased character edges and descenders
                 float box_w = static_cast<float>(mod["width"]);
                 float box_h = static_cast<float>(mod["height"]);
-                float shrink_y = box_h * 0.15f; 
-                float shrink_w = box_w * 0.05f;
+                float pad_y = 1.5f; // 1.5 points up and down
+                float pad_x = 2.5f; // 2.5 points left and right
 
                 // Color-matched rectangle to erase old text seamlessly
                 fz_append_printf(ctx_, over_buf, "q %f %f %f rg %f %f %f %g re f Q\n", 
                     r, g, b,
-                    pdf_x + (shrink_w/2), inverted_y + shrink_y, 
-                    box_w - shrink_w, box_h - (shrink_y * 1.5f));
+                    pdf_x - pad_x, inverted_y - pad_y, 
+                    box_w + (pad_x * 2.0f), box_h + (pad_y * 2.0f));
                 
                 // New text override
                 std::string escaped_new = escape_pdf_string(newStr);
